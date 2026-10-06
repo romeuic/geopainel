@@ -324,7 +324,13 @@ export default function App() {
             <dd>{fmt.pct(cidade() ? (candidato().municipios[cidade().codigo]?.pct ?? 0) : candidato().pct)}</dd>
           </div>
           <div>
-            <dt>{cidade() ? 'Bairros e distritos com voto' : 'Municípios com voto'}</dt>
+            <dt>
+              {cidade()
+                ? cidade().temInterior
+                  ? 'Bairros e distritos com voto'
+                  : 'Bairros com voto'
+                : 'Municípios com voto'}
+            </dt>
             <dd>
               {comVoto()} <small>de {municipios().length}</small>
             </dd>
@@ -349,7 +355,9 @@ export default function App() {
                   </span>
                 </p>
                 <div class="acoes-cidade">
-                  <Alternador rotulo="Recorte" opcoes={RECORTES} valor={recorte()} onEscolher={setRecorte} />
+                  <Show when={c().temInterior}>
+                    <Alternador rotulo="Recorte" opcoes={RECORTES} valor={recorte()} onEscolher={setRecorte} />
+                  </Show>
                   <button type="button" class="botao" onClick={voltarAoEstado}>
                     ← Mapa do RS
                   </button>
@@ -506,7 +514,7 @@ export default function App() {
           Fontes: TSE — resultado oficial, totalização {fonte.totalizacao}, gerado em {fonte.geradoEm}; IBGE — malha
           municipal e nomes. Dados embutidos em JSON no próprio front-end.
           <Show when={cidade()}>
-            {(c) => <> Mapa municipal: TSE — votação por seção e locais de votação; {c().fonte.osm}.</>}
+            {(c) => <> Mapa municipal: TSE — votação por seção e locais de votação; {c().fonte.contornos}.</>}
           </Show>
         </p>
       </footer>

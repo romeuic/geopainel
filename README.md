@@ -67,12 +67,20 @@ confere, para cada opção, que a soma municipal bate com o total estadual.
 
 ## Mapa municipal (por bairro)
 
-Cidades com dados por bairro ganham o botão **Mapa Municipal** no card. Por
-ora: **Passo Fundo**. O mapa mostra os 22 bairros (setores da Lei Municipal
-Complementar 143/2005), os 6 distritos do interior e o restante do
-distrito-sede, com os locais de votação como pontos. O recorte abre na zona
-urbana; "Município inteiro" mostra também o interior. Link direto:
-`?municipio=4314100`.
+Cidades com dados por bairro ganham o botão **Mapa Municipal** no card, e o
+mapa mostra os bairros com os locais de votação como pontos:
+
+- **Passo Fundo** (`?municipio=4314100`): os 22 bairros (setores da Lei
+  Municipal Complementar 143/2005), os 6 distritos do interior e o restante do
+  distrito-sede. O recorte abre na zona urbana; "Município inteiro" mostra
+  também o interior. Contornos do OpenStreetMap.
+- **Porto Alegre** (`?municipio=4314902`): os 94 bairros oficiais (Lei
+  12.112/2016), 344 locais, 3.077 urnas. Contornos da malha de bairros do IBGE
+  (Censo 2022).
+
+O voto é contado no bairro do **local de votação**, não no da casa do
+eleitor: bairros sem escola de votação aparecem zerados (em Porto Alegre:
+Jardim Europa, Vila Conceição, Sétimo Céu e São Caetano).
 
 ```bash
 npm run dados       # antes: os candidatos vêm de votos.json
@@ -88,17 +96,22 @@ Como os votos chegam aos bairros:
    e `_BR`): aptos,
    comparecimento, abstenções, brancos e nulos de cada urna — dá os eleitores
    dos bairros e as opções brancos, nulos e ausentes. Os nulos por seção não
-   trazem os "nulos técnicos" (2 ou 3 votos em Passo Fundo). Os aptos
+   trazem os "nulos técnicos" (2 ou 3 votos em Passo Fundo; 548 para deputado
+   estadual em Porto Alegre). Os aptos
    são por cargo: na eleição presidencial entram também eleitores em trânsito
    (150.021 em Passo Fundo, contra 149.612 para deputado).
 2. **TSE — eleitorado por local de votação** (`eleitorado_local_votacao_2026`):
    cada seção → seu local de votação, com coordenadas e o bairro cadastrado.
-3. **OpenStreetMap** — contornos dos bairros e distritos, baixados pela API do
-   OSM pelos IDs das relações em `CIDADES` (`scripts/municipio.mjs`). A malha
-   de bairros do IBGE (Censo 2022) não serve: para Passo Fundo ela tem um bairro
-   só.
-4. Cada local cai no bairro que contém suas coordenadas (`scripts/geo.mjs`);
-   os poucos locais sem coordenadas usam o bairro cadastrado no TSE.
+3. **Contornos dos bairros**, conforme `contornos` em `CIDADES`
+   (`scripts/municipio.mjs`):
+   - `'ibge'` — malha de bairros do Censo 2022, lida do shapefile pelo
+     `scripts/shp.mjs`. Serve onde o IBGE delimita os bairros (Porto Alegre).
+   - `{ osm: … }` — relações do OpenStreetMap baixadas pela API do OSM. Para
+     Passo Fundo, onde a malha do IBGE tem um bairro só.
+4. Cada local cai no bairro que contém suas coordenadas (`scripts/geo.mjs`).
+   Sem coordenadas, ou com o ponto fora de todos os contornos (na água, do
+   outro lado da divisa), vale o bairro cadastrado no TSE — e `apelidos`
+   resolve nomes que não são bairros (ex.: Ilha das Flores → Arquipélago).
 
 O script confere, para cada opção, que a soma das urnas bate com o resultado
 oficial da cidade em `votos.json`. Os **válidos** por bairro podem passar um
@@ -108,7 +121,9 @@ TSE exclui dos válidos. Só o "% dos válidos" dos bairros sente isso.
 
 Os arquivos do TSE (~640 MB) ficam em `.cache/` e só são baixados uma vez;
 o script usa o comando `unzip`. Para outra cidade, acrescente uma entrada em
-`CIDADES` com o código TSE e os IDs das relações do OSM.
+`CIDADES` com o código TSE e `contornos: 'ibge'` (confira antes se o IBGE
+tem os bairros dela) ou os IDs das relações do OSM, e rode
+`npm run municipio -- <código IBGE>`.
 
 ## Como o mapa é desenhado
 

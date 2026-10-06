@@ -39,6 +39,8 @@ export async function carregarCidade(codigo) {
   const bairros = dados.areas.features.filter((f) => porId.get(f.properties.id).tipo === 'bairro');
   return {
     ...dados,
+    // Só cidades com distritos/interior além dos bairros têm o que recortar.
+    temInterior: bairros.length < dados.areas.features.length,
     recortes: {
       urbano: projetar(dados, { features: bairros }, porId),
       municipio: projetar(dados, dados.areas, porId),
