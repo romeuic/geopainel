@@ -136,7 +136,7 @@ export default function App() {
   // Cidade aberta no mapa municipal (dados já projetados) ou null para o estado.
   const [cidade, setCidade] = createSignal(null);
   const [carregando, setCarregando] = createSignal(null);
-  const [recorte, setRecorte] = createSignal('urbano');
+  const [recorte, setRecorte] = createSignal('municipio');
   const vistaCidade = () => cidade()?.recortes[recorte()];
 
   const cargo = createMemo(() => cargos.find((c) => c.codigo === codigoCargo()));
@@ -195,6 +195,7 @@ export default function App() {
       const c = await carregarCidade(codigo);
       batch(() => {
         setCidade(c);
+        setRecorte('municipio'); // cada cidade abre inteira
         setFixado(null);
         setFoco(null);
         setBusca('');
@@ -498,13 +499,7 @@ export default function App() {
               <For each={ordenados().slice(0, NO_RANKING)}>
                 {(m) => (
                   <li>
-                    <button
-                      type="button"
-                      aria-pressed={fixado() === m.codigo}
-                      onClick={() => fixar(m.codigo)}
-                      onPointerEnter={() => setFoco(m.codigo)}
-                      onPointerLeave={() => setFoco(null)}
-                    >
+                    <button type="button" aria-pressed={fixado() === m.codigo} onClick={() => fixar(m.codigo)}>
                       <span class="amostra" style={{ background: cores()[m.codigo] }} />
                       <span class="nome">{m.nome}</span>
                       <span class="valor">{med(medida()).formatar(valor(m))}</span>

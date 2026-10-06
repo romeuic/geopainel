@@ -27,9 +27,12 @@ import { pipeline } from 'node:stream/promises';
 import { dentro, geometriaDaRelacao } from './geo.mjs';
 import { lerDbf, lerShp } from './shp.mjs';
 
-// contornos: 'ibge' (malha de bairros do Censo 2022) ou { osm: … } com IDs de
-// relações do OpenStreetMap. `apelidos`: bairro cadastrado no TSE → unidade,
-// usado só para locais de votação sem coordenadas.
+// contornos: { osm: { bairros, distritos, sede } } com IDs de relações do
+// OpenStreetMap, ou { ibge: […] } com as malhas do IBGE (Censo 2022) a usar:
+// 'bairros' e, se a cidade tiver interior, 'distritos' — o distrito-sede, menos
+// os bairros, vira "Interior do distrito-sede".
+// `apelidos`: bairro cadastrado no TSE → unidade, para locais sem coordenadas
+// ou fora dos contornos. `renomear`: nome do IBGE → nome de exibição.
 const CIDADES = {
   4314100: {
     nome: 'Passo Fundo',
@@ -51,10 +54,29 @@ const CIDADES = {
     nome: 'Porto Alegre',
     tse: '88013',
     // Os 94 bairros oficiais (Lei 12.112/2016), como o IBGE os delimita.
-    contornos: 'ibge',
+    contornos: { ibge: ['bairros'] },
     // Seções na Ilha das Flores, que faz parte do bairro Arquipélago.
     apelidos: { 'ILHA DAS FLORES': 'arquipelago' },
     credito: 'bairros: IBGE, malha de bairros do Censo 2022 (Lei 12.112/2016)',
+  },
+  4305108: {
+    nome: 'Caxias do Sul',
+    tse: '85995',
+    // 65 bairros da área urbana e 6 distritos do interior, ambos do IBGE.
+    contornos: { ibge: ['bairros', 'distritos'] },
+    apelidos: {},
+    // O IBGE grava os distritos sem o "Vila" com que são conhecidos, e um
+    // bairro em minúscula.
+    renomear: { Oliva: 'Vila Oliva', Seca: 'Vila Seca', 'de Lazzer': 'De Lazzer' },
+    credito: 'bairros e distritos: IBGE, malhas do Censo 2022',
+  },
+  4304606: {
+    nome: 'Canoas',
+    tse: '85898',
+    // 18 bairros; a cidade é toda urbana (um distrito só), então só bairros.
+    contornos: { ibge: ['bairros'] },
+    apelidos: {},
+    credito: 'bairros: IBGE, malha de bairros do Censo 2022',
   },
 };
 
@@ -79,10 +101,8 @@ const ARQ_LOCAIS = {
   csv: `eleitorado_local_votacao_2026_${UF}.csv`,
 };
 const OSM = 'https://api.openstreetmap.org/api/0.6/relation';
-const IBGE_BAIRROS = {
-  url: `https://geoftp.ibge.gov.br/organizacao_do_territorio/malhas_territoriais/malhas_de_setores_censitarios__divisoes_intramunicipais/censo_2022/bairros/shp/UF/${UF}_bairros_CD2022.zip`,
-  base: `${UF}_bairros_CD2022`,
-};
+const IBGE_MALHAS =
+  'https://geoftp.ibge.gov.br/organizacao_do_territorio/malhas_territoriais/malhas_de_setores_censitarios__divisoes_intramunicipais/censo_2022';
 const AGENTE = 'geopainel/0.1 (mapa eleitoral; dados abertos)';
 
 const semAcento = (s) =>
@@ -156,14 +176,35 @@ const lerDoZip = (zip, entrada) =>
     unzip.on('close', (c) => (c === 0 ? ok(Buffer.concat(partes)) : falha(new Error(`unzip ${entrada}: ${c}`))));
   });
 
-async function unidadesIbge(codigo) {
-  const zip = await baixar(IBGE_BAIRROS.url, `${IBGE_BAIRROS.base}.zip`);
-  const geometrias = lerShp(await lerDoZip(zip, `${IBGE_BAIRROS.base}.shp`));
-  const registros = lerDbf(await lerDoZip(zip, `${IBGE_BAIRROS.base}.dbf`));
-  return registros
-    .map((r, i) => ({ r, geometria: geometrias[i] }))
-    .filter(({ r, geometria }) => r.CD_MUN === codigo && geometria)
-    .map(({ r, geometria }) => ({ id: slug(r.NM_BAIRRO), nome: r.NM_BAIRRO, tipo: 'bairro', geometria }));
+// Malha do IBGE ('bairros' ou 'distritos') do RS inteiro, lida uma vez por execução.
+const malhas = {};
+function malhaIbge(tipo) {
+  return (malhas[tipo] ??= (async () => {
+    const base = `${UF}_${tipo}_CD2022`;
+    const zip = await baixar(`${IBGE_MALHAS}/${tipo}/shp/UF/${base}.zip`, `${base}.zip`);
+    const geometrias = lerShp(await lerDoZip(zip, `${base}.shp`));
+    return lerDbf(await lerDoZip(zip, `${base}.dbf`)).map((r, i) => ({ r, geometria: geometrias[i] }));
+  })());
+}
+
+async function unidadesIbge(codigo, malhasPedidas, renomear = {}) {
+  const nome = (n) => renomear[n] ?? n;
+  const unidades = [];
+  if (malhasPedidas.includes('distritos')) {
+    const distritos = (await malhaIbge('distritos')).filter(({ r, geometria }) => r.CD_MUN === codigo && geometria);
+    // O distrito-sede tem o código do município seguido de "05".
+    for (const { r, geometria } of distritos)
+      unidades.push(
+        r.CD_DIST === `${codigo}05`
+          ? { id: 'interior', nome: 'Interior do distrito-sede', tipo: 'interior', geometria }
+          : { id: slug(nome(r.NM_DIST)), nome: nome(r.NM_DIST), tipo: 'distrito', geometria, nomes: [r.NM_DIST] },
+      );
+    unidades.sort((a, b) => (a.tipo === 'interior' ? -1 : b.tipo === 'interior' ? 1 : 0));
+  }
+  for (const { r, geometria } of await malhaIbge('bairros'))
+    if (r.CD_MUN === codigo && geometria)
+      unidades.push({ id: slug(nome(r.NM_BAIRRO)), nome: nome(r.NM_BAIRRO), tipo: 'bairro', geometria });
+  return unidades;
 }
 
 async function unidadesOsm({ sede: idSede, distritos, bairros }) {
@@ -190,9 +231,9 @@ async function unidadesOsm({ sede: idSede, distritos, bairros }) {
 }
 
 async function gerarCidade(codigo, cidade, votosEstado, zips) {
-  const ibge = cidade.contornos === 'ibge';
+  const { ibge, osm } = cidade.contornos;
   console.log(`${cidade.nome}: contornos (${ibge ? 'IBGE' : 'OpenStreetMap'})…`);
-  const unidades = ibge ? await unidadesIbge(codigo) : await unidadesOsm(cidade.contornos.osm);
+  const unidades = ibge ? await unidadesIbge(codigo, ibge, cidade.renomear) : await unidadesOsm(osm);
   const ids = unidades.map((u) => u.id);
   if (new Set(ids).size !== ids.length) throw new Error(`${cidade.nome}: bairros com o mesmo identificador.`);
   // Ordem de busca: bairro, distrito, e por fim o resto do distrito-sede.

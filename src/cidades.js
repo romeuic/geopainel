@@ -8,7 +8,7 @@ export const CIDADES_DETALHADAS = new Map(
   Object.entries(carregadores).map(([caminho, carregar]) => [caminho.match(/(\d+)\.json$/)[1], carregar]),
 );
 
-export const RECORTES = { urbano: 'Zona urbana', municipio: 'Município inteiro' };
+export const RECORTES = { municipio: 'Município inteiro', urbano: 'Zona urbana' };
 
 // Projeta todas as áreas e locais, enquadrando só `ajuste`: no recorte urbano o
 // que fica fora dos bairros é cortado pela borda do SVG.

@@ -256,12 +256,36 @@ input:focus-visible {
   display: block;
   width: 100%;
   height: auto;
-  touch-action: manipulation;
+  /* Sem zoom, um dedo rola a página e a pinça fica com o mapa; aproximado,
+     o mapa fica com todos os gestos. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mapa svg.aproximado {
+  touch-action: none;
+}
+
+.mapa svg.aproximado .municipios path {
+  cursor: grab;
+}
+
+.mapa svg.arrastando,
+.mapa svg.arrastando .municipios path {
+  cursor: grabbing;
+}
+
+/* Linhas com a mesma espessura em qualquer zoom. */
+.municipios path,
+.contorno,
+.locais circle {
+  vector-effect: non-scaling-stroke;
 }
 
 .municipios path {
   stroke: var(--contorno-municipio);
-  stroke-width: 0.5;
+  stroke-width: 0.35px;
   stroke-linejoin: round;
   cursor: pointer;
 }
@@ -270,7 +294,7 @@ input:focus-visible {
 .locais circle {
   fill: rgba(255, 255, 255, 0.85);
   stroke: rgba(10, 14, 28, 0.6);
-  stroke-width: 0.8;
+  stroke-width: 0.6px;
   pointer-events: none;
 }
 
@@ -282,12 +306,42 @@ input:focus-visible {
 
 .contorno.foco {
   stroke: var(--contorno-foco);
-  stroke-width: 1.6;
+  stroke-width: 1.5px;
 }
 
 .contorno.fixado {
   stroke: var(--contorno-fixado);
-  stroke-width: 2.4;
+  stroke-width: 2px;
+}
+
+.zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.zoom button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--sombra);
+}
+
+.zoom button:hover:not(:disabled) {
+  border-color: var(--texto);
+}
+
+.zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .dica {

@@ -83,15 +83,20 @@ mapa mostra os bairros com os locais de votação como pontos:
 
 - **Passo Fundo** (`?municipio=4314100`): os 22 bairros (setores da Lei
   Municipal Complementar 143/2005), os 6 distritos do interior e o restante do
-  distrito-sede. O recorte abre na zona urbana; "Município inteiro" mostra
-  também o interior. Contornos do OpenStreetMap.
+  distrito-sede. O mapa abre no município inteiro; "Zona urbana" aproxima nos bairros. Contornos do OpenStreetMap.
 - **Porto Alegre** (`?municipio=4314902`): os 94 bairros oficiais (Lei
   12.112/2016), 344 locais, 3.077 urnas. Contornos da malha de bairros do IBGE
   (Censo 2022).
+- **Caxias do Sul** (`?municipio=4305108`): 65 bairros da área urbana, 6
+  distritos do interior e o restante do distrito-sede; 168 locais, 1.125
+  urnas. Bairros e distritos das malhas do IBGE (Censo 2022).
+- **Canoas** (`?municipio=4304606`): 18 bairros, 91 locais, 760 urnas; cidade
+  toda urbana. Contornos da malha de bairros do IBGE (Censo 2022).
 
 O voto é contado no bairro do **local de votação**, não no da casa do
 eleitor: bairros sem escola de votação aparecem zerados (em Porto Alegre:
-Jardim Europa, Vila Conceição, Sétimo Céu e São Caetano).
+Jardim Europa, Vila Conceição, Sétimo Céu e São Caetano; em Canoas:
+Industrial, Ilha das Graças e Brigadeira).
 
 ```bash
 npm run dados       # antes: os candidatos vêm de votos.json
@@ -115,10 +120,14 @@ Como os votos chegam aos bairros:
    cada seção → seu local de votação, com coordenadas e o bairro cadastrado.
 3. **Contornos dos bairros**, conforme `contornos` em `CIDADES`
    (`scripts/municipio.mjs`):
-   - `'ibge'` — malha de bairros do Censo 2022, lida do shapefile pelo
-     `scripts/shp.mjs`. Serve onde o IBGE delimita os bairros (Porto Alegre).
-   - `{ osm: … }` — relações do OpenStreetMap baixadas pela API do OSM. Para
-     Passo Fundo, onde a malha do IBGE tem um bairro só.
+   - `{ ibge: ['bairros', 'distritos'] }` — malhas do Censo 2022, lidas do
+     shapefile pelo `scripts/shp.mjs`. Os bairros do IBGE cobrem só a área
+     urbana; com `'distritos'`, entram também os distritos do interior e o
+     restante do distrito-sede (Caxias do Sul). Só `['bairros']` quando a
+     cidade é toda urbana (Porto Alegre).
+   - `{ osm: { bairros, distritos, sede } }` — relações do OpenStreetMap
+     baixadas pela API do OSM. Para Passo Fundo, onde a malha do IBGE tem um
+     bairro só.
 4. Cada local cai no bairro que contém suas coordenadas (`scripts/geo.mjs`).
    Sem coordenadas, ou com o ponto fora de todos os contornos (na água, do
    outro lado da divisa), vale o bairro cadastrado no TSE — e `apelidos`
@@ -132,14 +141,18 @@ TSE exclui dos válidos. Só o "% dos válidos" dos bairros sente isso.
 
 Os arquivos do TSE (~640 MB) ficam em `.cache/` e só são baixados uma vez;
 o script usa o comando `unzip`. Para outra cidade, acrescente uma entrada em
-`CIDADES` com o código TSE e `contornos: 'ibge'` (confira antes se o IBGE
-tem os bairros dela) ou os IDs das relações do OSM, e rode
+`CIDADES` com o código TSE e `contornos: { ibge: […] }` (confira antes se o
+IBGE tem os bairros dela) ou os IDs das relações do OSM, e rode
 `npm run municipio -- <código IBGE>`.
 
 ## Como o mapa é desenhado
 
 - **Projeção** (`src/projecao.js`): equirretangular com correção de cosseno na
   latitude média, sem bibliotecas — suficiente para o recorte do RS.
+- **Zoom e arraste** (`src/zoom.js`, `src/Mapa.jsx`): roda do mouse (no
+  cursor), pinça ou botões +/−/⤢; arrastar move o mapa aproximado (até 16×).
+  Sem zoom, afastar a roda e arrastar com um dedo rolam a página normalmente;
+  um arraste não conta como clique. Trocar de mapa volta à vista inteira.
 - **Cor** (`src/escala.js`): interpolação em OKLab entre `#0b1d51` e `#ff1f1f`.
 - **Escala**: logarítmica por padrão, porque Porto Alegre (9.002 votos) tem
   4,6× a segunda cidade e, na linear, quase todo o estado fica azul. A linear
