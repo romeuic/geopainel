@@ -4,8 +4,8 @@ Mapa de calor dos votos para deputado estadual em cada um dos 497 municípios
 do Rio Grande do Sul — Eleições 2026, 1º turno (04/10/2026). Azul-escuro =
 0 votos; vermelho nítido = maior votação do candidato escolhido.
 
-Candidatos no seletor: **Humberto Matos (65065, PCdoB)** e **Giovani Culau
-(65656, PCdoB)**. O candidato fica na URL (`?candidato=65656`), então o link
+Candidatos no seletor: **Humberto Matos (65065, PCdoB)**, **Giovani Culau
+(65656, PCdoB)** e **Erick Denil (65444, PCdoB)**. O candidato fica na URL (`?candidato=65656`), então o link
 pode ser compartilhado.
 
 Solid + Vite, sem backend: todos os dados vivem em JSON dentro de `src/dados/`.
@@ -30,7 +30,7 @@ Para regenerar, ou para escolher quais candidatos a deputado estadual do RS
 entram no seletor:
 
 ```bash
-npm run dados                        # 65065 e 65656
+npm run dados                        # 65065, 65656 e 65444
 npm run dados -- 65065 65656 13013   # lista própria, na ordem do seletor
 ```
 

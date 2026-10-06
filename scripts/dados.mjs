@@ -1,13 +1,13 @@
 // Gera os JSONs de src/dados/ a partir das fontes oficiais:
 //   - TSE: resultado da eleição estadual de 2026 (1º turno), um arquivo por município;
 //   - IBGE: malha municipal do RS e nomes dos municípios.
-// Uso: node scripts/dados.mjs [números dos candidatos…]   (padrão: 65065 65656)
+// Uso: node scripts/dados.mjs [números dos candidatos…]   (padrão: 65065 65656 65444)
 // Todos os candidatos vão para um único src/dados/votos.json; cada arquivo
 // municipal do TSE é baixado uma vez só, qualquer que seja o número de candidatos.
 
 import { writeFile } from 'node:fs/promises';
 
-const NUMEROS = process.argv.length > 2 ? process.argv.slice(2) : ['65065', '65656'];
+const NUMEROS = process.argv.length > 2 ? process.argv.slice(2) : ['65065', '65656', '65444'];
 const UF = 'rs';
 const COD_UF_IBGE = 43;
 const ELEICAO = '6259'; // Eleição Ordinária Estadual - 2026 1º Turno
