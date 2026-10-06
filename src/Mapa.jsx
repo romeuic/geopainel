@@ -142,7 +142,7 @@ export default function Mapa(props) {
   const destaque = (codigo) => (codigo ? props.formas.find((f) => f.codigo === codigo)?.d : null);
 
   return (
-    <div class="mapa" ref={(el) => (caixa = el)}>
+    <div class="mapa" ref={(el) => (caixa = el)} style={{ '--razao': props.largura / props.altura }}>
       <svg
         ref={(el) => (svg = el)}
         viewBox={viewBox()}

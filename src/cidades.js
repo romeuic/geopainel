@@ -37,13 +37,16 @@ export async function carregarCidade(codigo) {
   const dados = await CIDADES_DETALHADAS.get(codigo)();
   const porId = new Map(dados.unidades.map((u) => [u.id, u]));
   const bairros = dados.areas.features.filter((f) => porId.get(f.properties.id).tipo === 'bairro');
+  const municipio = projetar(dados, dados.areas, porId);
   return {
     ...dados,
-    // Só cidades com distritos/interior além dos bairros têm o que recortar.
-    temInterior: bairros.length < dados.areas.features.length,
+    // Sem bairros oficiais (Gravataí), a cidade é dividida só pelos distritos.
+    soDistritos: bairros.length === 0,
+    // Só cidades com bairros e também interior têm o que recortar.
+    temInterior: bairros.length > 0 && bairros.length < dados.areas.features.length,
     recortes: {
-      urbano: projetar(dados, { features: bairros }, porId),
-      municipio: projetar(dados, dados.areas, porId),
+      urbano: bairros.length ? projetar(dados, { features: bairros }, porId) : municipio,
+      municipio,
     },
   };
 }

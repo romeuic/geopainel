@@ -92,6 +92,29 @@ mapa mostra os bairros com os locais de votação como pontos:
   urnas. Bairros e distritos das malhas do IBGE (Censo 2022).
 - **Canoas** (`?municipio=4304606`): 18 bairros, 91 locais, 760 urnas; cidade
   toda urbana. Contornos da malha de bairros do IBGE (Censo 2022).
+- **Santa Maria** (`?municipio=4316907`): 41 bairros da área urbana, 9
+  distritos do interior e o restante do distrito-sede; 115 locais, 636 urnas.
+  Bairros e distritos das malhas do IBGE (Censo 2022).
+- **Gravataí** (`?municipio=4309209`): só os 5 distritos oficiais do IBGE
+  (a sede, Barro Vermelho, Ipiranga, Itacolomi e Morungava); 77 locais, 539
+  urnas. Não há bairros oficiais publicados (nem IBGE, nem OSM, nem
+  geoportal), e a cidade não usa contornos estimados — a sede reúne 503 urnas.
+- **Pelotas** (`?municipio=4314407`): as 7 regiões administrativas (Centro,
+  Fragata, Três Vendas, Areal, São Gonçalo, Laranjal / Z3, Barragem) — o que o
+  TSE usa como bairro — e os 8 distritos do interior; 114 locais, 757 urnas.
+  Regiões do OpenStreetMap (o IBGE não tem bairros de Pelotas), distritos do
+  IBGE. O TSE cadastra o interior como "2º Distrito"… "9º Distrito"; a
+  correspondência com os nomes está em `apelidos`.
+- **Dona Francisca** (`?municipio=4306700`): as 12 comunidades rurais
+  (Sanga Funda, Linha Ávila, Vila Alegre, Trombudo, Formoso, Linha dos
+  Dambrós, Passo dos Ropke, Linha do Moinho, Retorcida, Linha Grande, Linha do
+  Soturno e Central e Acácio Flores, que no mapa de origem dividem um
+  polígono); 7 locais, 11 urnas. Não há bairros no IBGE nem no OSM e o
+  município tem um distrito só: as divisas vêm da Figura 1 de Reck, Dorr,
+  Ceretta e Dalla Valle, _Produtos orgânicos e artesanais nas festas de
+  comunidade_, Estudo & Debate 33(2), 2026 (CC BY-NC 4.0), vetorizada em
+  `scripts/contornos/4306700.geo.json`. O CCD Pinheirão, cadastrado no TSE
+  em "Linha Grande", fica pelas coordenadas em Passo dos Ropke.
 
 O voto é contado no bairro do **local de votação**, não no da casa do
 eleitor: bairros sem escola de votação aparecem zerados (em Porto Alegre:
@@ -118,16 +141,28 @@ Como os votos chegam aos bairros:
    (150.021 em Passo Fundo, contra 149.612 para deputado).
 2. **TSE — eleitorado por local de votação** (`eleitorado_local_votacao_2026`):
    cada seção → seu local de votação, com coordenadas e o bairro cadastrado.
-3. **Contornos dos bairros**, conforme `contornos` em `CIDADES`
-   (`scripts/municipio.mjs`):
-   - `{ ibge: ['bairros', 'distritos'] }` — malhas do Censo 2022, lidas do
-     shapefile pelo `scripts/shp.mjs`. Os bairros do IBGE cobrem só a área
-     urbana; com `'distritos'`, entram também os distritos do interior e o
-     restante do distrito-sede (Caxias do Sul). Só `['bairros']` quando a
-     cidade é toda urbana (Porto Alegre).
-   - `{ osm: { bairros, distritos, sede } }` — relações do OpenStreetMap
-     baixadas pela API do OSM. Para Passo Fundo, onde a malha do IBGE tem um
-     bairro só.
+3. **Contornos**, conforme `contornos` em `CIDADES` (`scripts/municipio.mjs`),
+   com fonte própria para bairros e para distritos:
+   - `bairros: 'ibge'` — malha de bairros do Censo 2022, lida do shapefile
+     pelo `scripts/shp.mjs` (Porto Alegre, Caxias do Sul, Canoas, Santa
+     Maria). Ou a lista
+     de IDs de relações do OpenStreetMap, quando o IBGE não delimita os bairros
+     (Passo Fundo, Pelotas).
+   - `bairros: { arquivo }` — GeoJSON em `scripts/contornos/` (features com
+     `id` e `nome`), para divisões que só existem num mapa publicado (Dona
+     Francisca). A figura foi segmentada pelas linhas de divisa e
+     georreferenciada encaixando o contorno dela no do IBGE (IoU 0,98); a
+     borda externa é a da malha de distritos do IBGE e só as divisas internas
+     vêm da figura. A fonte fica no campo `fonte` do arquivo.
+   - Sem bairros oficiais em lugar nenhum (Gravataí), `bairros` fica de fora
+     e a cidade é dividida só pelos distritos; a sede vira um distrito como
+     os outros. Contornos estimados não são usados.
+   - `distritos: 'ibge'` (malha de distritos) ou `{ osm: [IDs], sede: ID }`,
+     só para cidades com interior: entram os distritos e o restante do
+     distrito-sede. Sem `distritos`, a cidade é tratada como toda urbana.
+   - Relações do OSM às vezes têm um pedaço de divisa faltando; vãos de até
+     ~200 m são fechados com uma reta (`VAO_MAX` em `scripts/geo.mjs`) e o
+     script avisa quais.
 4. Cada local cai no bairro que contém suas coordenadas (`scripts/geo.mjs`).
    Sem coordenadas, ou com o ponto fora de todos os contornos (na água, do
    outro lado da divisa), vale o bairro cadastrado no TSE — e `apelidos`

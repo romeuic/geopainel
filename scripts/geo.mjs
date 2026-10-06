@@ -3,30 +3,48 @@
 
 const chave = ([lon, lat]) => `${lon},${lat}`;
 
+// Vão máximo (graus, ~200 m) que montarAneis fecha com uma reta: relações do
+// OSM às vezes têm um pedaço de divisa faltando (Fragata, em Pelotas: ~160 m).
+export const VAO_MAX = 2e-3;
+
 /**
  * Junta trechos de linha (cada um uma lista de [lon, lat]) em anéis fechados,
- * encadeando pelas pontas, invertendo trechos quando preciso. Trechos que não
- * fecham um anel são descartados e devolvidos em `soltos`.
+ * encadeando pelas duas pontas e invertendo trechos quando preciso. Uma cadeia
+ * cujas pontas ficam a até VAO_MAX vira anel e conta em `remendados`; o que não
+ * fecha volta em `soltos`.
  */
 export function montarAneis(trechos) {
   const restantes = trechos.map((t) => [...t]);
   const aneis = [];
   const soltos = [];
+  let remendados = 0;
+  const fechado = (a) => chave(a[0]) === chave(a.at(-1));
   while (restantes.length) {
     let anel = restantes.shift();
-    let fechou = chave(anel[0]) === chave(anel.at(-1));
-    while (!fechou) {
+    while (!fechado(anel)) {
       const fim = chave(anel.at(-1));
-      const i = restantes.findIndex((t) => chave(t[0]) === fim || chave(t.at(-1)) === fim);
+      const inicio = chave(anel[0]);
+      let i = restantes.findIndex((t) => chave(t[0]) === fim || chave(t.at(-1)) === fim);
+      if (i >= 0) {
+        const [t] = restantes.splice(i, 1);
+        anel = anel.concat((chave(t[0]) === fim ? t : [...t].reverse()).slice(1));
+        continue;
+      }
+      i = restantes.findIndex((t) => chave(t[0]) === inicio || chave(t.at(-1)) === inicio);
       if (i < 0) break;
       const [t] = restantes.splice(i, 1);
-      const seguinte = chave(t[0]) === fim ? t : [...t].reverse();
-      anel = anel.concat(seguinte.slice(1));
-      fechou = chave(anel[0]) === chave(anel.at(-1));
+      anel = (chave(t.at(-1)) === inicio ? t : [...t].reverse()).slice(0, -1).concat(anel);
     }
-    (fechou ? aneis : soltos).push(anel);
+    if (!fechado(anel) && anel.length > 3) {
+      const [[x0, y0], [x1, y1]] = [anel[0], anel.at(-1)];
+      if (Math.hypot(x1 - x0, y1 - y0) <= VAO_MAX) {
+        anel.push(anel[0]);
+        remendados += 1;
+      }
+    }
+    (fechado(anel) ? aneis : soltos).push(anel);
   }
-  return { aneis, soltos };
+  return { aneis, soltos, remendados };
 }
 
 /** Ponto dentro de um anel (ray casting). */
@@ -75,6 +93,7 @@ export function geometriaDaRelacao(elementos) {
   return {
     tags: relacao.tags,
     soltos: externos.soltos.length + internos.soltos.length,
+    remendados: externos.remendados + internos.remendados,
     geometria:
       poligonos.length === 1
         ? { type: 'Polygon', coordinates: poligonos[0] }

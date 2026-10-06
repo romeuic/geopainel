@@ -82,3 +82,39 @@ test('geometriaDaRelacao monta polígono com buraco a partir do OSM', () => {
   assert.ok(dentro([1, 1], r.geometria));
   assert.ok(!dentro([5, 5], r.geometria));
 });
+
+test('montarAneis emenda pelas duas pontas e fecha vão pequeno', () => {
+  // Trechos em ordem "de trás para frente" e um vão de ~3 m entre as pontas.
+  const { aneis, soltos, remendados } = montarAneis([
+    [
+      [1, 1],
+      [0, 1],
+      [0, 0.00002],
+    ],
+    [
+      [1, 0],
+      [1, 1],
+    ],
+    [
+      [0, 0],
+      [1, 0],
+    ],
+  ]);
+  assert.equal(soltos.length, 0);
+  assert.equal(aneis.length, 1);
+  assert.equal(remendados, 1);
+  assert.deepEqual(aneis[0][0], aneis[0].at(-1));
+});
+
+test('vão grande não é fechado', () => {
+  const { aneis, soltos } = montarAneis([
+    [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 0.5],
+    ],
+  ]);
+  assert.equal(aneis.length, 0); // vão de 0,5° (~50 km)
+  assert.equal(soltos.length, 1);
+});

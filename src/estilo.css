@@ -195,8 +195,19 @@ h1 .numero {
   box-shadow: var(--sombra);
 }
 
+/* No máximo a altura da tela: o mapa encolhe (mantendo a proporção) para os
+   controles e a legenda caberem junto. */
 .area-mapa {
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+  max-height: 100dvh;
   padding: 12px;
+  container-type: inline-size;
+}
+
+.area-mapa > * {
+  flex-shrink: 0;
 }
 
 .controles {
@@ -248,14 +259,20 @@ input:focus-visible {
 
 /* Mapa */
 
+/* Base = altura do mapa na largura toda; encolhe se a tela for baixa. O SVG
+   fica com a maior largura que cabe na caixa na proporção do mapa (--razao). */
 .mapa {
   position: relative;
+  flex: 0 1 calc(100cqw / var(--razao, 1));
+  min-height: 160px;
+  container-type: size;
 }
 
 .mapa svg {
   display: block;
-  width: 100%;
+  width: min(100cqw, 100cqh * var(--razao, 1));
   height: auto;
+  margin-inline: auto;
   /* Sem zoom, um dedo rola a página e a pinça fica com o mapa; aproximado,
      o mapa fica com todos os gestos. */
   touch-action: pan-y;

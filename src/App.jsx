@@ -337,7 +337,9 @@ export default function App() {
               {cidade()
                 ? cidade().temInterior
                   ? 'Bairros e distritos com voto'
-                  : 'Bairros com voto'
+                  : cidade().soDistritos
+                    ? 'Distritos com voto'
+                    : 'Bairros com voto'
                 : 'Municípios com voto'}
             </dt>
             <dd>
@@ -357,7 +359,7 @@ export default function App() {
             {(c) => (
               <div class="faixa-cidade">
                 <p>
-                  <strong>{c().nome}</strong> por bairro ·{' '}
+                  <strong>{c().nome}</strong> por {c().soDistritos ? 'distrito' : 'bairro'} ·{' '}
                   <span class="fraco">
                     {fmt.votos(c().unidades.reduce((s, u) => s + u.urnas, 0))} urnas em {c().locais.length} locais de
                     votação (pontos)
@@ -413,11 +415,13 @@ export default function App() {
 
         <aside class="painel">
           <label class="busca">
-            <span>{cidade() ? 'Buscar bairro ou distrito' : 'Buscar município'}</span>
+            <span>
+              {!cidade() ? 'Buscar município' : cidade().soDistritos ? 'Buscar distrito' : 'Buscar bairro ou distrito'}
+            </span>
             <input
               type="search"
               list="lista-municipios"
-              placeholder={cidade() ? 'Ex.: Centro' : 'Ex.: Pelotas'}
+              placeholder={!cidade() ? 'Ex.: Pelotas' : cidade().soDistritos ? '' : 'Ex.: Centro'}
               value={busca()}
               onInput={(e) => buscar(e.currentTarget.value)}
             />
@@ -432,7 +436,10 @@ export default function App() {
             <Show
               when={selecionado()}
               fallback={
-                <p class="fraco">Passe o mouse ou toque num {cidade() ? 'bairro' : 'município'} para ver os números.</p>
+                <p class="fraco">
+                  Passe o mouse ou toque num {!cidade() ? 'município' : cidade().soDistritos ? 'distrito' : 'bairro'}{' '}
+                  para ver os números.
+                </p>
               }
             >
               {(m) => (
