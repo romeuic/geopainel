@@ -53,17 +53,19 @@ export function cor(t) {
 
 /**
  * Posição de um valor na escala, em [0, 1].
- * 'log' usa log(1 + v), que mantém 0 em 0 e evita que a capital
- * deixe todo o resto do estado na mesma cor.
+ * 'log' usa log(1 + v/unidade), que mantém 0 em 0 e evita que a capital
+ * deixe todo o resto do estado na mesma cor. `unidade` é o menor valor
+ * positivo da medida: 1 para contagem de votos; para frações (proporção,
+ * percentual) sem ela log(1 + v) ≈ v e a escala viraria linear.
  */
-export function posicao(valor, maximo, escala = 'log') {
+export function posicao(valor, maximo, escala = 'log', unidade = 1) {
   if (!(maximo > 0) || !(valor > 0)) return 0;
-  const t = escala === 'log' ? Math.log1p(valor) / Math.log1p(maximo) : valor / maximo;
+  const t = escala === 'log' ? Math.log1p(valor / unidade) / Math.log1p(maximo / unidade) : valor / maximo;
   return Math.min(1, t);
 }
 
 /** Inverso de posicao(): o valor que fica na posição t. */
-export function valorEm(t, maximo, escala = 'log') {
+export function valorEm(t, maximo, escala = 'log', unidade = 1) {
   if (!(maximo > 0)) return 0;
-  return escala === 'log' ? Math.expm1(t * Math.log1p(maximo)) : t * maximo;
+  return escala === 'log' ? unidade * Math.expm1(t * Math.log1p(maximo / unidade)) : t * maximo;
 }

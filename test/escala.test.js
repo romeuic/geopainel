@@ -29,3 +29,12 @@ test('valorEm é o inverso de posicao', () => {
   for (const escala of ['log', 'linear'])
     for (const v of [1, 37, 950, 9002]) assert.ok(Math.abs(valorEm(posicao(v, 9002, escala), 9002, escala) - v) < 1e-6);
 });
+
+test('com unidade, a escala log também espalha frações pequenas', () => {
+  const max = 0.0149;
+  const unidade = 0.0002;
+  assert.ok(posicao(0.001, max, 'log') < 0.07); // sem unidade: praticamente linear
+  assert.ok(posicao(0.001, max, 'log', unidade) > 0.4);
+  assert.equal(posicao(max, max, 'log', unidade), 1);
+  assert.ok(Math.abs(valorEm(posicao(0.003, max, 'log', unidade), max, 'log', unidade) - 0.003) < 1e-12);
+});

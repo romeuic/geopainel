@@ -11,7 +11,11 @@ export default function Legenda(props) {
       <div class="barra" style={{ 'background-image': GRADIENTE }} />
       <ol class="marcas">
         <For each={MARCAS}>
-          {(t) => <li style={{ left: `${t * 100}%` }}>{props.formatar(valorEm(t, props.maximo, props.escala))}</li>}
+          {(t) => (
+            <li style={{ left: `${t * 100}%` }}>
+              {props.formatar(valorEm(t, props.maximo, props.escala, props.unidade))}
+            </li>
+          )}
         </For>
       </ol>
       <figcaption>{props.titulo}</figcaption>
