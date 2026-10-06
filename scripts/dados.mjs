@@ -20,7 +20,7 @@ const CARGOS = {
 };
 const PADRAO = {
   estadual: ['65065', '65656', '65444', '65653', '65123:f', '65651:f', '65'],
-  federal: ['6565:f', '6500', '65'],
+  federal: ['6565:f', '6500', '65', '1330', '1307'],
 };
 const UF = 'rs';
 const COD_UF_IBGE = 43;

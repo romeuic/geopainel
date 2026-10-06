@@ -4,16 +4,21 @@ Mapa de calor dos votos para deputado estadual e deputado federal em cada um
 dos 497 municípios do Rio Grande do Sul — Eleições 2026, 1º turno (04/10/2026).
 Azul-escuro = 0 votos; vermelho nítido = maior votação da opção escolhida.
 
-Opções nos seletores de cargo e candidatura (todas do PCdoB):
+Seletores de partido, cargo e candidatura:
 
-- **Dep. Estadual:** Humberto Matos (65065), Giovani Culau (65656), Erick
-  Denil (65444), Nilvo Riboldi (65653), Sandra Picoli (65123), Professora
-  Bilina (65651) e os votos na legenda (65) — voto só no partido.
-- **Dep. Federal:** Daiana Santos (6565), Tonhão dos Santos (6500) e os votos
-  na legenda (65).
+- **PCdoB**
+  - **Dep. Estadual:** Humberto Matos (65065), Giovani Culau (65656), Erick
+    Denil (65444), Nilvo Riboldi (65653), Sandra Picoli (65123), Professora
+    Bilina (65651) e os votos na legenda (65) — voto só no partido.
+  - **Dep. Federal:** Daiana Santos (6565), Tonhão dos Santos (6500) e os
+    votos na legenda (65).
+- **PT**
+  - **Dep. Federal:** Naiton Gama (1330) e Valdeci Oliveira (1307).
 
-A seleção fica na URL (`?cargo=federal&candidato=6565`), então o link pode ser
-compartilhado.
+A lista de partidos sai dos dados (sigla do TSE de cada opção); um cargo sem
+opção do partido escolhido fica desabilitado. A seleção fica na URL
+(`?partido=PT&cargo=federal&candidato=1330`), então o link pode ser
+compartilhado; só `?candidato=…` também basta.
 
 Solid + Vite, sem backend: todos os dados vivem em JSON dentro de `src/dados/`.
 

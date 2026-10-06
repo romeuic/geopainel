@@ -18,17 +18,31 @@ const formas = malha.features
 const SEM_VOTO = { votos: 0, pct: 0 };
 const OPCOES_CARGO = Object.fromEntries(cargos.map((c) => [c.codigo, c.rotulo]));
 
-// Seleção inicial vem de ?cargo=…&candidato=…, para o link ser compartilhável.
-// Sem cargo na URL, vale o cargo do número (a legenda "65" pode existir nos dois).
+// Partidos na ordem em que aparecem nos dados; sigla do TSE → nome de exibição.
+const PARTIDOS = [...new Set(cargos.flatMap((c) => c.candidatos.map((x) => x.partido)))];
+const OPCOES_PARTIDO = Object.fromEntries(PARTIDOS.map((p) => [p, fmt.partido(p)]));
+
+const doPartido = (cargo, partido) => cargo.candidatos.filter((c) => c.partido === partido);
+// O cargo preferido, se tiver opção do partido; senão o primeiro que tenha.
+const cargoComPartido = (partido, preferido) =>
+  preferido && doPartido(preferido, partido).length ? preferido : cargos.find((c) => doPartido(c, partido).length);
+
+// Seleção inicial vem de ?partido=…&cargo=…&candidato=…, para o link ser
+// compartilhável. O número manda: partido e cargo são os dele; sem cargo na URL,
+// vale o primeiro cargo onde o número existe (a legenda "65" existe nos dois).
 function selecaoDaUrl() {
   const busca = new URLSearchParams(location.search);
   const numero = busca.get('candidato');
   const temNumero = (c) => c.candidatos.some((x) => x.numero === numero);
   const doCargo = cargos.find((c) => c.codigo === busca.get('cargo'));
   const achado = doCargo && temNumero(doCargo) ? doCargo : cargos.find(temNumero);
-  if (achado) return { cargo: achado.codigo, numero };
-  const cargo = doCargo ?? cargos[0];
-  return { cargo: cargo.codigo, numero: cargo.candidatos[0].numero };
+  if (achado) {
+    const partido = achado.candidatos.find((x) => x.numero === numero).partido;
+    return { partido, cargo: achado.codigo, numero };
+  }
+  const partido = PARTIDOS.includes(busca.get('partido')) ? busca.get('partido') : PARTIDOS[0];
+  const cargo = cargoComPartido(partido, doCargo);
+  return { partido, cargo: cargo.codigo, numero: doPartido(cargo, partido)[0].numero };
 }
 
 const MEDIDAS = {
@@ -60,6 +74,8 @@ function Alternador(props) {
             type="button"
             role="radio"
             aria-checked={props.valor === valor}
+            disabled={props.desabilitadas?.has(valor)}
+            title={props.desabilitadas?.has(valor) ? props.motivo : undefined}
             onClick={() => props.onEscolher(valor)}
           >
             {texto}
@@ -72,6 +88,7 @@ function Alternador(props) {
 
 export default function App() {
   const inicial = selecaoDaUrl();
+  const [partido, setPartido] = createSignal(inicial.partido);
   const [codigoCargo, setCodigoCargo] = createSignal(inicial.cargo);
   const [numero, setNumero] = createSignal(inicial.numero);
   const [medida, setMedida] = createSignal('votos');
@@ -81,7 +98,11 @@ export default function App() {
   const [busca, setBusca] = createSignal('');
 
   const cargo = createMemo(() => cargos.find((c) => c.codigo === codigoCargo()));
-  const candidato = createMemo(() => cargo().candidatos.find((c) => c.numero === numero()));
+  const opcoes = createMemo(() => doPartido(cargo(), partido()));
+  const candidato = createMemo(() => opcoes().find((c) => c.numero === numero()));
+  const cargosSemPartido = createMemo(
+    () => new Set(cargos.filter((c) => !doPartido(c, partido()).length).map((c) => c.codigo)),
+  );
   const municipios = createMemo(() => {
     const votos = candidato().municipios;
     const base = cargo().municipios;
@@ -96,6 +117,7 @@ export default function App() {
 
   function atualizarUrl() {
     const url = new URL(location.href);
+    url.searchParams.set('partido', partido());
     url.searchParams.set('cargo', codigoCargo());
     url.searchParams.set('candidato', numero());
     history.replaceState(null, '', url);
@@ -108,9 +130,21 @@ export default function App() {
 
   function escolherCargo(codigo) {
     if (codigo === codigoCargo()) return;
+    const novoCargo = cargos.find((c) => c.codigo === codigo);
     batch(() => {
       setCodigoCargo(codigo);
-      setNumero(cargos.find((c) => c.codigo === codigo).candidatos[0].numero);
+      setNumero(doPartido(novoCargo, partido())[0].numero);
+    });
+    atualizarUrl();
+  }
+
+  function escolherPartido(p) {
+    if (p === partido()) return;
+    const novoCargo = cargoComPartido(p, cargo());
+    batch(() => {
+      setPartido(p);
+      setCodigoCargo(novoCargo.codigo);
+      setNumero(doPartido(novoCargo, p)[0].numero);
     });
     atualizarUrl();
   }
@@ -147,19 +181,29 @@ export default function App() {
       <header class="topo">
         <div class="linha-topo">
           <p class="marca">Geopainel</p>
-          <Alternador rotulo="Cargo" opcoes={OPCOES_CARGO} valor={codigoCargo()} onEscolher={escolherCargo} />
-          <label class="seletor">
-            <span>Candidatura</span>
-            <select value={numero()} onChange={(e) => escolherCandidato(e.currentTarget.value)}>
-              <For each={cargo().candidatos}>
-                {(c) => (
-                  <option value={c.numero}>
-                    {fmt.titulo(c)} — {c.numero}
-                  </option>
-                )}
-              </For>
-            </select>
-          </label>
+          <div class="seletores">
+            <Alternador rotulo="Partido" opcoes={OPCOES_PARTIDO} valor={partido()} onEscolher={escolherPartido} />
+            <Alternador
+              rotulo="Cargo"
+              opcoes={OPCOES_CARGO}
+              valor={codigoCargo()}
+              onEscolher={escolherCargo}
+              desabilitadas={cargosSemPartido()}
+              motivo={`Sem opções do ${fmt.partido(partido())} neste cargo`}
+            />
+            <label class="seletor">
+              <span>Candidatura</span>
+              <select value={numero()} onChange={(e) => escolherCandidato(e.currentTarget.value)}>
+                <For each={opcoes()}>
+                  {(c) => (
+                    <option value={c.numero}>
+                      {fmt.titulo(c)} — {c.numero}
+                    </option>
+                  )}
+                </For>
+              </select>
+            </label>
+          </div>
         </div>
         <h1>
           {fmt.titulo(candidato())} <span class="numero">{candidato().numero}</span>

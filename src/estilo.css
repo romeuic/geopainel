@@ -72,6 +72,13 @@ input {
   margin-bottom: 6px;
 }
 
+.seletores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
 .seletor {
   display: inline-flex;
   align-items: center;
@@ -201,6 +208,7 @@ h1 .numero {
 
 .alternador {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -217,7 +225,13 @@ h1 .numero {
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.alternador button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .alternador button[aria-checked='true'] {
