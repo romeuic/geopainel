@@ -1,8 +1,12 @@
 # Geopainel
 
-Mapa de calor dos votos de **Humberto Matos (65065, PCdoB)** para deputado
-estadual em cada um dos 497 municípios do Rio Grande do Sul — Eleições 2026,
-1º turno (04/10/2026). Azul-escuro = 0 votos; vermelho nítido = maior votação.
+Mapa de calor dos votos para deputado estadual em cada um dos 497 municípios
+do Rio Grande do Sul — Eleições 2026, 1º turno (04/10/2026). Azul-escuro =
+0 votos; vermelho nítido = maior votação do candidato escolhido.
+
+Candidatos no seletor: **Humberto Matos (65065, PCdoB)** e **Giovani Culau
+(65656, PCdoB)**. O candidato fica na URL (`?candidato=65656`), então o link
+pode ser compartilhado.
 
 Solid + Vite, sem backend: todos os dados vivem em JSON dentro de `src/dados/`.
 
@@ -17,21 +21,21 @@ npm run build    # gera dist/ estático
 
 ## Dados
 
-| arquivo                            | conteúdo                                                                                                             | fonte                                               |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `src/dados/votos-65065.json`       | candidato, totais e, por código IBGE: `votos`, `pct` (dos válidos no município), `validos`, `secoes` (% totalizadas) | TSE, `resultados.tse.jus.br`, eleição 6259, cargo 7 |
-| `src/dados/municipios-rs.geo.json` | GeoJSON dos municípios (`codigo` IBGE, `nome`), coordenadas em 3 casas                                               | IBGE, API de malhas v3, qualidade intermediária     |
+| arquivo                            | conteúdo                                                                                                                                                                                  | fonte                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `src/dados/votos.json`             | `municipios` (por código IBGE: `validos`, `secoes` % totalizadas) e `candidatos[]` com totais e, por código IBGE, `votos` e `pct` (dos válidos no município); município ausente = 0 votos | TSE, `resultados.tse.jus.br`, eleição 6259, cargo 7 |
+| `src/dados/municipios-rs.geo.json` | GeoJSON dos municípios (`codigo` IBGE, `nome`), coordenadas em 3 casas                                                                                                                    | IBGE, API de malhas v3, qualidade intermediária     |
 
-Para regenerar (ou gerar para outro candidato a deputado estadual do RS):
+Para regenerar, ou para escolher quais candidatos a deputado estadual do RS
+entram no seletor:
 
 ```bash
-npm run dados            # 65065
-npm run dados -- 13013   # outro número
+npm run dados                        # 65065 e 65656
+npm run dados -- 65065 65656 13013   # lista própria, na ordem do seletor
 ```
 
-O script baixa os 497 arquivos municipais do TSE e confere que a soma bate com
-o total estadual. Para outro candidato, troque também o `import` em
-`src/App.jsx`.
+O script baixa cada um dos 497 arquivos municipais do TSE uma vez só e confere,
+para cada candidato, que a soma municipal bate com o total estadual.
 
 ## Como o mapa é desenhado
 

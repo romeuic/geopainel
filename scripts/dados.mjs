@@ -1,11 +1,13 @@
 // Gera os JSONs de src/dados/ a partir das fontes oficiais:
 //   - TSE: resultado da eleição estadual de 2026 (1º turno), um arquivo por município;
 //   - IBGE: malha municipal do RS e nomes dos municípios.
-// Uso: node scripts/dados.mjs [numero-do-candidato]   (padrão: 65065)
+// Uso: node scripts/dados.mjs [números dos candidatos…]   (padrão: 65065 65656)
+// Todos os candidatos vão para um único src/dados/votos.json; cada arquivo
+// municipal do TSE é baixado uma vez só, qualquer que seja o número de candidatos.
 
 import { writeFile } from 'node:fs/promises';
 
-const NUMERO = process.argv[2] ?? '65065';
+const NUMEROS = process.argv.length > 2 ? process.argv.slice(2) : ['65065', '65656'];
 const UF = 'rs';
 const COD_UF_IBGE = 43;
 const ELEICAO = '6259'; // Eleição Ordinária Estadual - 2026 1º Turno
@@ -43,11 +45,14 @@ async function emLotes(itens, limite, fn) {
   return resultados;
 }
 
-function acharCandidato(arquivo) {
+// Mapa número → { cand, par } dos candidatos pedidos presentes no arquivo.
+function acharCandidatos(arquivo) {
   const cargo = arquivo.carg.find((c) => c.cd === String(Number(CARGO)));
+  const achados = new Map();
   for (const agr of cargo.agr)
-    for (const par of agr.par) for (const cand of par.cand ?? []) if (cand.n === NUMERO) return { cand, par };
-  return null;
+    for (const par of agr.par)
+      for (const cand of par.cand ?? []) if (NUMEROS.includes(cand.n)) achados.set(cand.n, { cand, par });
+  return achados;
 }
 
 // Arredonda coordenadas a 3 casas (~100 m): municípios vizinhos compartilham
@@ -69,32 +74,36 @@ async function main() {
   const tabela = await json(`${TSE}/config/mun-e00${ELEICAO}-cm.json`);
   const municipiosTse = tabela.abr.find((a) => a.cd.toLowerCase() === UF).mu;
   const estadual = await json(`${TSE}/dados/${UF}/${UF}-c${CARGO}-e00${ELEICAO}-u.json`);
-  const achado = acharCandidato(estadual);
-  if (!achado) throw new Error(`Candidato ${NUMERO} não encontrado no resultado de ${UF.toUpperCase()}.`);
-  const { cand, par } = achado;
+  const noEstado = acharCandidatos(estadual);
+  const faltando = NUMEROS.filter((n) => !noEstado.has(n));
+  if (faltando.length)
+    throw new Error(`Candidato(s) ${faltando.join(', ')} não encontrado(s) no resultado de ${UF.toUpperCase()}.`);
 
   console.log(`TSE: ${municipiosTse.length} municípios…`);
   const linhas = await emLotes(municipiosTse, 6, async (m, i) => {
     const arq = await json(`${TSE}/dados/${UF}/${UF}${m.cd}-c${CARGO}-e00${ELEICAO}-u.json`);
-    const c = acharCandidato(arq)?.cand;
+    const achados = acharCandidatos(arq);
     if ((i + 1) % 50 === 0) console.log(`  ${i + 1}/${municipiosTse.length}`);
-    return {
-      ibge: m.cdi,
-      votos: c ? num(c.vap) : 0,
-      pct: c ? num(c.pvapn) : 0,
-      validos: num(arq.v.vv),
-      secoes: num(arq.s.pstn),
-    };
+    return { ibge: m.cdi, validos: num(arq.v.vv), secoes: num(arq.s.pstn), achados };
   });
 
   const porMunicipio = {};
-  for (const { ibge, ...resto } of linhas) porMunicipio[ibge] = resto;
-  const soma = linhas.reduce((s, l) => s + l.votos, 0);
-  if (soma !== num(cand.vap)) console.warn(`Aviso: soma municipal (${soma}) difere do total estadual (${cand.vap}).`);
+  for (const l of linhas) porMunicipio[l.ibge] = { validos: l.validos, secoes: l.secoes };
 
-  const votos = {
-    candidato: {
-      numero: cand.n,
+  // Por candidato, só os municípios com voto; ausente no JSON = 0 votos.
+  const candidatos = NUMEROS.map((numero) => {
+    const { cand, par } = noEstado.get(numero);
+    const municipios = {};
+    for (const l of linhas) {
+      const c = l.achados.get(numero)?.cand;
+      if (c && num(c.vap) > 0) municipios[l.ibge] = { votos: num(c.vap), pct: num(c.pvapn) };
+    }
+    const soma = Object.values(municipios).reduce((s, m) => s + m.votos, 0);
+    if (soma !== num(cand.vap))
+      console.warn(`Aviso: ${numero} — soma municipal (${soma}) difere do total estadual (${cand.vap}).`);
+    console.log(`  ${cand.nmu} (${numero}): ${soma} votos em ${Object.keys(municipios).length} municípios.`);
+    return {
+      numero,
       nome: cand.nm,
       nomeUrna: cand.nmu,
       partido: par.sg,
@@ -102,7 +111,11 @@ async function main() {
       situacao: cand.st,
       votos: num(cand.vap),
       pct: num(cand.pvapn),
-    },
+      municipios,
+    };
+  });
+
+  const votos = {
     fonte: {
       eleicao: 'Eleições 2026 — 1º turno (04/10/2026)',
       tse: `${TSE}/dados/${UF}/`,
@@ -110,6 +123,7 @@ async function main() {
       totalizacao: estadual.tf === 's' ? 'final' : 'parcial',
     },
     municipios: porMunicipio,
+    candidatos,
   };
 
   const features = malha.features.map((f) => {
@@ -124,12 +138,12 @@ async function main() {
   const semVoto = features.filter((f) => !porMunicipio[f.properties.codigo]).map((f) => f.properties.nome);
   if (semVoto.length) console.warn(`Aviso: municípios da malha sem resultado do TSE: ${semVoto.join(', ')}`);
 
-  await writeFile(new URL(`votos-${NUMERO}.json`, SAIDA), JSON.stringify(votos, null, 1) + '\n');
+  await writeFile(new URL('votos.json', SAIDA), JSON.stringify(votos, null, 1) + '\n');
   await writeFile(
     new URL('municipios-rs.geo.json', SAIDA),
     JSON.stringify({ type: 'FeatureCollection', features }) + '\n',
   );
-  console.log(`Pronto: ${cand.nmu} (${cand.n}) — ${soma} votos em ${linhas.filter((l) => l.votos).length} municípios.`);
+  console.log(`Pronto: ${candidatos.length} candidato(s) em src/dados/votos.json.`);
 }
 
 main().catch((erro) => {

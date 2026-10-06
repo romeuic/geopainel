@@ -63,8 +63,41 @@ input {
 
 /* Topo */
 
+.linha-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 6px;
+}
+
+.seletor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fraco);
+}
+
+.seletor select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.seletor select:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
 .marca {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
