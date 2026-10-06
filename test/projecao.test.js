@@ -37,3 +37,12 @@ test('MultiPolygon gera um subcaminho por anel', () => {
   assert.equal(d.match(/M/g).length, 2);
   assert.equal(d.match(/Z/g).length, 2);
 });
+
+test('ponto() usa o mesmo sistema de caminho()', () => {
+  const col = { features: [quadrado(-57, -33, 1), quadrado(-50, -28, 1)] };
+  const p = criarProjecao(col, 1000, 0);
+  assert.deepEqual(p.ponto([-57, -27]), [0, 0]);
+  const [x, y] = p.ponto([-49, -33]);
+  assert.equal(x, 1000);
+  assert.ok(Math.abs(y - p.altura) <= 1); // altura é arredondada para cima
+});

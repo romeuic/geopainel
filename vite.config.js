@@ -7,7 +7,8 @@ export default defineConfig({
   build: {
     target: ['chrome80', 'safari13', 'firefox78'],
     sourcemap: false,
-    // O bundle carrega a malha municipal do IBGE (~200 KB gzip); é esperado.
-    chunkSizeWarningLimit: 1000,
+    // O bundle carrega a malha municipal do IBGE e os votos por município
+    // (~265 KB gzip); é esperado.
+    chunkSizeWarningLimit: 1200,
   },
 });

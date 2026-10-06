@@ -1,4 +1,4 @@
-import { batch, createMemo, createSignal, For, Show } from 'solid-js';
+import { batch, createMemo, createSignal, For, onMount, Show } from 'solid-js';
 import malha from './dados/municipios-rs.geo.json';
 import resultado from './dados/votos.json';
 import Mapa from './Mapa.jsx';
@@ -6,11 +6,12 @@ import Legenda from './Legenda.jsx';
 import { cor, posicao } from './escala.js';
 import { criarProjecao } from './projecao.js';
 import * as fmt from './formato.js';
+import { CIDADES_DETALHADAS, RECORTES, carregarCidade } from './cidades.js';
 
 const { cargos, fonte } = resultado;
 const projecao = criarProjecao(malha, 1000);
 
-// Formas que não mudam com cargo nem candidato.
+// Formas do estado, que não mudam com cargo nem candidato.
 const formas = malha.features
   .map((f) => ({ codigo: f.properties.codigo, nome: f.properties.nome, d: projecao.caminho(f) }))
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -19,7 +20,10 @@ const SEM_VOTO = { votos: 0, pct: 0 };
 const OPCOES_CARGO = Object.fromEntries(cargos.map((c) => [c.codigo, c.rotulo]));
 
 // Partidos na ordem em que aparecem nos dados; sigla do TSE → nome de exibição.
-const PARTIDOS = [...new Set(cargos.flatMap((c) => c.candidatos.map((x) => x.partido)))];
+// "N/A" (brancos, nulos, ausentes) fica sempre por último.
+const PARTIDOS = [...new Set(cargos.flatMap((c) => c.candidatos.map((x) => x.partido)))].sort(
+  (a, b) => (a === 'N/A') - (b === 'N/A'),
+);
 const OPCOES_PARTIDO = Object.fromEntries(PARTIDOS.map((p) => [p, fmt.partido(p)]));
 
 const doPartido = (cargo, partido) => cargo.candidatos.filter((c) => c.partido === partido);
@@ -47,7 +51,7 @@ function selecaoDaUrl() {
 
 const MEDIDAS = {
   // rotulo: o botão; nome: o mesmo, dentro de frases ("Maiores por …").
-  votos: { rotulo: 'Votos', nome: 'votos', titulo: () => 'Votos no município', formatar: fmt.votos },
+  votos: { rotulo: 'Votos', nome: 'votos', titulo: (_, escopo) => `Votos por ${escopo}`, formatar: fmt.votos },
   pct: {
     rotulo: '% dos válidos',
     nome: '% dos válidos',
@@ -57,11 +61,36 @@ const MEDIDAS = {
   prop: {
     rotulo: 'A cada 100',
     nome: 'eleitores a cada 100',
-    titulo: () => 'Eleitores do município que votaram nesta opção, a cada 100 (de 0 a 100)',
+    titulo: (_, escopo) => `Eleitores que votaram nesta opção, a cada 100, por ${escopo} (de 0 a 100)`,
     formatar: fmt.proporcao,
   },
 };
+// Base do percentual de cada opção (campo `base` em votos.json): candidaturas
+// e legenda sobre os válidos; brancos e nulos sobre o total de votos;
+// ausentes sobre o eleitorado apto — as mesmas bases do TSE.
+const BASES = {
+  validos: {
+    rotulo: '% dos válidos',
+    titulo: (cargo) => `Percentual dos votos válidos para ${cargo.nome.toLowerCase()}`,
+    curto: 'Dos válidos',
+    dica: 'dos válidos',
+  },
+  votos: {
+    rotulo: '% dos votos',
+    titulo: (cargo) => `Percentual do total de votos para ${cargo.nome.toLowerCase()}`,
+    curto: 'Dos votos',
+    dica: 'dos votos',
+  },
+  eleitores: {
+    rotulo: '% do eleitorado',
+    titulo: () => 'Percentual do eleitorado apto',
+    curto: 'Do eleitorado',
+    dica: 'do eleitorado',
+  },
+};
 const ESCALAS = { log: 'Logarítmica', linear: 'Linear' };
+// "no município", "no bairro"… para os rótulos do painel.
+const ONDE = { municipio: 'no município', bairro: 'no bairro', distrito: 'no distrito', interior: 'na área' };
 const NO_RANKING = 15;
 
 function Alternador(props) {
@@ -96,32 +125,93 @@ export default function App() {
   const [foco, setFoco] = createSignal(null);
   const [fixado, setFixado] = createSignal(null);
   const [busca, setBusca] = createSignal('');
+  // Cidade aberta no mapa municipal (dados já projetados) ou null para o estado.
+  const [cidade, setCidade] = createSignal(null);
+  const [carregando, setCarregando] = createSignal(null);
+  const [recorte, setRecorte] = createSignal('urbano');
+  const vistaCidade = () => cidade()?.recortes[recorte()];
 
   const cargo = createMemo(() => cargos.find((c) => c.codigo === codigoCargo()));
   const opcoes = createMemo(() => doPartido(cargo(), partido()));
   const candidato = createMemo(() => opcoes().find((c) => c.numero === numero()));
+  const base = () => BASES[candidato().base];
+  // A medida "%" troca de rótulo conforme a base da opção escolhida.
+  const med = (k) =>
+    k === 'pct' ? { ...MEDIDAS.pct, rotulo: base().rotulo, nome: base().rotulo, titulo: base().titulo } : MEDIDAS[k];
   const cargosSemPartido = createMemo(
     () => new Set(cargos.filter((c) => !doPartido(c, partido()).length).map((c) => c.codigo)),
   );
+  // Uma linha por área da vista atual: municípios do estado ou bairros da cidade.
   const municipios = createMemo(() => {
+    const c = cidade();
+    if (c) {
+      const dadosCargo = c.cargos[codigoCargo()];
+      const votos = dadosCargo.votos[numero()] ?? {};
+      return vistaCidade().formas.map((f) => {
+        const n = votos[f.codigo] ?? 0;
+        const validos = dadosCargo.validos[f.codigo] ?? 0;
+        // Aptos variam por cargo (na eleição federal entram eleitores em trânsito).
+        const eleitores = dadosCargo.eleitores[f.codigo] ?? 0;
+        const prop = eleitores ? (n / eleitores) * 100 : 0;
+        const base = { validos, votos: dadosCargo.comparecimento[f.codigo] ?? 0, eleitores }[candidato().base];
+        return { ...f, eleitores, validos, votos: n, pct: base ? (n / base) * 100 : 0, prop };
+      });
+    }
     const votos = candidato().municipios;
     const base = cargo().municipios;
     return formas.map((f) => {
       const { eleitores = 0, validos = 0 } = base[f.codigo] ?? {};
       const v = votos[f.codigo] ?? SEM_VOTO;
-      return { ...f, eleitores, validos, ...v, prop: eleitores ? (v.votos / eleitores) * 100 : 0 };
+      return { ...f, tipo: 'municipio', eleitores, validos, ...v, prop: eleitores ? (v.votos / eleitores) * 100 : 0 };
     });
   });
   const porCodigo = createMemo(() => new Map(municipios().map((m) => [m.codigo, m])));
-  const comVoto = createMemo(() => Object.keys(candidato().municipios).length);
+  const comVoto = createMemo(() => municipios().filter((m) => m.votos > 0).length);
+  const totalVista = createMemo(() => (cidade() ? municipios().reduce((s, m) => s + m.votos, 0) : candidato().votos));
+  const escopo = () => (cidade() ? 'área' : 'município');
 
   function atualizarUrl() {
     const url = new URL(location.href);
     url.searchParams.set('partido', partido());
     url.searchParams.set('cargo', codigoCargo());
     url.searchParams.set('candidato', numero());
+    if (cidade()) url.searchParams.set('municipio', cidade().codigo);
+    else url.searchParams.delete('municipio');
     history.replaceState(null, '', url);
   }
+
+  async function abrirCidade(codigo) {
+    if (!CIDADES_DETALHADAS.has(codigo)) return;
+    setCarregando(codigo);
+    try {
+      const c = await carregarCidade(codigo);
+      batch(() => {
+        setCidade(c);
+        setFixado(null);
+        setFoco(null);
+        setBusca('');
+      });
+      atualizarUrl();
+    } finally {
+      setCarregando(null);
+    }
+  }
+
+  function voltarAoEstado() {
+    const codigo = cidade()?.codigo;
+    batch(() => {
+      setCidade(null);
+      setFoco(null);
+      setBusca('');
+      setFixado(codigo ?? null);
+    });
+    atualizarUrl();
+  }
+
+  onMount(() => {
+    const codigo = new URLSearchParams(location.search).get('municipio');
+    if (codigo) abrirCidade(codigo);
+  });
 
   function escolherCandidato(n) {
     setNumero(n);
@@ -172,7 +262,7 @@ export default function App() {
   function buscar(texto) {
     setBusca(texto);
     const alvo = fmt.normalizar(texto);
-    const achado = alvo && formas.find((m) => fmt.normalizar(m.nome) === alvo);
+    const achado = alvo && municipios().find((m) => fmt.normalizar(m.nome) === alvo);
     if (achado) setFixado(achado.codigo);
   }
 
@@ -197,7 +287,7 @@ export default function App() {
                 <For each={opcoes()}>
                   {(c) => (
                     <option value={c.numero}>
-                      {fmt.titulo(c)} — {c.numero}
+                      {c.tipo === 'especial' ? fmt.titulo(c) : `${fmt.titulo(c)} — ${c.numero}`}
                     </option>
                   )}
                 </For>
@@ -206,106 +296,137 @@ export default function App() {
           </div>
         </div>
         <h1>
-          {fmt.titulo(candidato())} <span class="numero">{candidato().numero}</span>
+          {fmt.titulo(candidato())}{' '}
+          <Show when={candidato().tipo !== 'especial'}>
+            <span class="numero">{candidato().numero}</span>
+          </Show>
         </h1>
         <p class="sub">
-          {candidato().cargo} · {fmt.partido(candidato().partido)} · Rio Grande do Sul · {fonte.eleicao}
+          {[
+            candidato().cargo,
+            candidato().tipo !== 'especial' && fmt.partido(candidato().partido),
+            'Rio Grande do Sul',
+            fonte.eleicao,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </p>
         <dl class="numeros">
           <div>
-            <dt>Votos no estado</dt>
-            <dd>{fmt.votos(candidato().votos)}</dd>
+            <dt>
+              {candidato().numero === 'ausentes' ? 'Ausentes' : 'Votos'}{' '}
+              {cidade() ? `em ${cidade().nome}` : 'no estado'}
+            </dt>
+            <dd>{fmt.votos(totalVista())}</dd>
           </div>
           <div>
-            <dt>Dos válidos</dt>
-            <dd>{fmt.pct(candidato().pct)}</dd>
+            <dt>{base().curto}</dt>
+            <dd>{fmt.pct(cidade() ? (candidato().municipios[cidade().codigo]?.pct ?? 0) : candidato().pct)}</dd>
           </div>
           <div>
-            <dt>Municípios com voto</dt>
+            <dt>{cidade() ? 'Bairros e distritos com voto' : 'Municípios com voto'}</dt>
             <dd>
-              {comVoto()} <small>de {formas.length}</small>
+              {comVoto()} <small>de {municipios().length}</small>
             </dd>
           </div>
-          <Show
-            when={candidato().tipo !== 'legenda'}
-            fallback={
-              <div>
-                <dt>Tipo</dt>
-                <dd class="situacao">Voto só no partido</dd>
-              </div>
-            }
-          >
-            <div>
-              <dt>Situação</dt>
-              <dd class="situacao">{candidato().situacao}</dd>
-            </div>
-          </Show>
+          <div>
+            <dt>{candidato().tipo === 'candidatura' ? 'Situação' : 'Tipo'}</dt>
+            <dd class="situacao">{candidato().situacao}</dd>
+          </div>
         </dl>
       </header>
 
       <main class="corpo">
         <section class="area-mapa" aria-label="Mapa de calor">
+          <Show when={cidade()}>
+            {(c) => (
+              <div class="faixa-cidade">
+                <p>
+                  <strong>{c().nome}</strong> por bairro ·{' '}
+                  <span class="fraco">
+                    {fmt.votos(c().unidades.reduce((s, u) => s + u.urnas, 0))} urnas em {c().locais.length} locais de
+                    votação (pontos)
+                  </span>
+                </p>
+                <div class="acoes-cidade">
+                  <Alternador rotulo="Recorte" opcoes={RECORTES} valor={recorte()} onEscolher={setRecorte} />
+                  <button type="button" class="botao" onClick={voltarAoEstado}>
+                    ← Mapa do RS
+                  </button>
+                </div>
+              </div>
+            )}
+          </Show>
           <div class="controles">
             <Alternador
               rotulo="Medida"
-              opcoes={Object.fromEntries(Object.entries(MEDIDAS).map(([k, v]) => [k, v.rotulo]))}
+              opcoes={Object.fromEntries(Object.keys(MEDIDAS).map((k) => [k, med(k).rotulo]))}
               valor={medida()}
               onEscolher={setMedida}
             />
             <Alternador rotulo="Escala" opcoes={ESCALAS} valor={escala()} onEscolher={setEscala} />
           </div>
           <Mapa
-            formas={formas}
+            formas={vistaCidade()?.formas ?? formas}
+            pontos={vistaCidade()?.pontos}
             cores={cores()}
-            largura={projecao.largura}
-            altura={projecao.altura}
+            largura={vistaCidade()?.largura ?? projecao.largura}
+            altura={vistaCidade()?.altura ?? projecao.altura}
             foco={foco()}
             fixado={fixado()}
             onFoco={setFoco}
             onFixar={fixar}
             dados={(c) => porCodigo().get(c)}
-            rotulo={`Mapa do Rio Grande do Sul com ${fmt.descricao(candidato())} por município. Use a busca ou o ranking para consultar um município.`}
+            contagem={(n) => fmt.contagem(candidato(), n)}
+            dicaPct={base().dica}
+            rotulo={
+              cidade()
+                ? `Mapa de ${cidade().nome} com ${fmt.descricao(candidato())} por bairro. Use a busca ou o ranking para consultar um bairro.`
+                : `Mapa do Rio Grande do Sul com ${fmt.descricao(candidato())} por município. Use a busca ou o ranking para consultar um município.`
+            }
           />
           <Legenda
             maximo={maximo()}
             escala={escala()}
             unidade={unidade()}
-            formatar={MEDIDAS[medida()].formatar}
-            titulo={`${MEDIDAS[medida()].titulo(cargo())} — escala ${ESCALAS[escala()].toLowerCase()}`}
+            formatar={med(medida()).formatar}
+            titulo={`${med(medida()).titulo(cargo(), escopo())} — escala ${ESCALAS[escala()].toLowerCase()}`}
           />
         </section>
 
         <aside class="painel">
           <label class="busca">
-            <span>Buscar município</span>
+            <span>{cidade() ? 'Buscar bairro ou distrito' : 'Buscar município'}</span>
             <input
               type="search"
               list="lista-municipios"
-              placeholder="Ex.: Pelotas"
+              placeholder={cidade() ? 'Ex.: Centro' : 'Ex.: Pelotas'}
               value={busca()}
               onInput={(e) => buscar(e.currentTarget.value)}
             />
             <datalist id="lista-municipios">
-              <For each={formas}>{(m) => <option value={m.nome} />}</For>
+              <For each={[...municipios()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))}>
+                {(m) => <option value={m.nome} />}
+              </For>
             </datalist>
           </label>
 
           <section class="cartao" aria-live="polite">
             <Show
               when={selecionado()}
-              fallback={<p class="fraco">Passe o mouse ou toque num município para ver os números.</p>}
+              fallback={
+                <p class="fraco">Passe o mouse ou toque num {cidade() ? 'bairro' : 'município'} para ver os números.</p>
+              }
             >
               {(m) => (
                 <>
                   <header>
-                    <h2>{m().nome}</h2>
+                    <h2>
+                      {m().nome}
+                      <Show when={m().setor}>{(setor) => <small class="fraco"> · {setor()}</small>}</Show>
+                    </h2>
                     <Show when={fixado()}>
-                      <button
-                        type="button"
-                        class="fechar"
-                        onClick={() => setFixado(null)}
-                        aria-label="Soltar município"
-                      >
+                      <button type="button" class="fechar" onClick={() => setFixado(null)} aria-label="Soltar seleção">
                         ×
                       </button>
                     </Show>
@@ -313,32 +434,50 @@ export default function App() {
                   <div class="destaques">
                     <span class="amostra" style={{ background: cores()[m().codigo] }} />
                     <p>
-                      <strong>{fmt.votos(m().votos)}</strong> {m().votos === 1 ? 'voto' : 'votos'}
+                      <strong>{fmt.votos(m().votos)}</strong> {fmt.contagem(candidato(), m().votos)}
                     </p>
                   </div>
                   <dl>
-                    <dt>Dos válidos no município</dt>
+                    <dt>
+                      {base().curto} {ONDE[m().tipo]}
+                    </dt>
                     <dd>{fmt.pct(m().pct)}</dd>
                     <dt>A cada 100 eleitores</dt>
                     <dd>{fmt.proporcao(m().prop)}</dd>
-                    <dt>Eleitores no município</dt>
+                    <dt>Eleitores {ONDE[m().tipo]}</dt>
                     <dd>{fmt.votos(m().eleitores)}</dd>
                     <dt>Votos válidos ({cargo().rotulo.toLowerCase()})</dt>
                     <dd>{fmt.votos(m().validos)}</dd>
-                    <dt>Parcela da votação total</dt>
-                    <dd>{fmt.pct((m().votos / candidato().votos) * 100)}</dd>
-                    <dt>Posição ({MEDIDAS[medida()].nome})</dt>
+                    <Show when={cidade()}>
+                      <dt>Urnas (seções)</dt>
+                      <dd>{fmt.votos(m().urnas)}</dd>
+                      <dt>Locais de votação</dt>
+                      <dd>{fmt.votos(m().locais)}</dd>
+                    </Show>
+                    <dt>{cidade() ? `Parcela da votação em ${cidade().nome}` : 'Parcela da votação total'}</dt>
+                    <dd>{fmt.pct(totalVista() ? (m().votos / totalVista()) * 100 : 0)}</dd>
+                    <dt>Posição ({med(medida()).nome})</dt>
                     <dd>
-                      {posicaoNoRanking().get(m().codigo)}º de {formas.length}
+                      {posicaoNoRanking().get(m().codigo)}º de {municipios().length}
                     </dd>
                   </dl>
+                  <Show when={!cidade() && CIDADES_DETALHADAS.has(m().codigo)}>
+                    <button
+                      type="button"
+                      class="botao principal"
+                      disabled={carregando() === m().codigo}
+                      onClick={() => abrirCidade(m().codigo)}
+                    >
+                      {carregando() === m().codigo ? 'Carregando…' : 'Mapa Municipal'}
+                    </button>
+                  </Show>
                 </>
               )}
             </Show>
           </section>
 
           <section class="ranking">
-            <h2>Maiores por {MEDIDAS[medida()].nome}</h2>
+            <h2>Maiores por {med(medida()).nome}</h2>
             <ol>
               <For each={ordenados().slice(0, NO_RANKING)}>
                 {(m) => (
@@ -352,7 +491,7 @@ export default function App() {
                     >
                       <span class="amostra" style={{ background: cores()[m.codigo] }} />
                       <span class="nome">{m.nome}</span>
-                      <span class="valor">{MEDIDAS[medida()].formatar(valor(m))}</span>
+                      <span class="valor">{med(medida()).formatar(valor(m))}</span>
                     </button>
                   </li>
                 )}
@@ -366,6 +505,9 @@ export default function App() {
         <p>
           Fontes: TSE — resultado oficial, totalização {fonte.totalizacao}, gerado em {fonte.geradoEm}; IBGE — malha
           municipal e nomes. Dados embutidos em JSON no próprio front-end.
+          <Show when={cidade()}>
+            {(c) => <> Mapa municipal: TSE — votação por seção e locais de votação; {c().fonte.osm}.</>}
+          </Show>
         </p>
       </footer>
     </div>

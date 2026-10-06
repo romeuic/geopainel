@@ -8,7 +8,7 @@ function* pontos(geometria) {
 
 /**
  * Cria a projeção para um FeatureCollection, ajustada a `largura` unidades de
- * SVG. Devolve { largura, altura, caminho(feature) }.
+ * SVG. Devolve { largura, altura, caminho(feature), ponto([lon, lat]) }.
  */
 export function criarProjecao(colecao, largura = 1000, margem = 8) {
   let [oeste, sul, leste, norte] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -35,5 +35,8 @@ export function criarProjecao(colecao, largura = 1000, margem = 8) {
     return d;
   }
 
-  return { largura, altura, caminho };
+  /** [lon, lat] → [x, y] no mesmo sistema do SVG. */
+  const ponto = ([lon, lat]) => [Number(x(lon)), Number(y(lat))];
+
+  return { largura, altura, caminho, ponto };
 }

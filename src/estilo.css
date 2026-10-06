@@ -266,6 +266,14 @@ input:focus-visible {
   cursor: pointer;
 }
 
+/* Locais de votação no mapa municipal: só marcação, o hover fica na área. */
+.locais circle {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: rgba(10, 14, 28, 0.6);
+  stroke-width: 0.8;
+  pointer-events: none;
+}
+
 .contorno {
   fill: none;
   pointer-events: none;
@@ -384,6 +392,11 @@ input:focus-visible {
   align-items: start;
   justify-content: space-between;
   gap: 8px;
+}
+
+.cartao h2 small {
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .cartao h2 {
@@ -519,4 +532,60 @@ input:focus-visible {
   margin-top: 20px;
   font-size: 12px;
   color: var(--fraco);
+}
+
+/* Mapa municipal */
+
+.faixa-cidade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--fundo);
+  font-size: 14px;
+}
+
+.faixa-cidade p {
+  margin: 0;
+}
+
+.acoes-cidade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.botao {
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.botao:hover {
+  border-color: var(--texto);
+}
+
+.botao.principal {
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 14px;
+  background: var(--texto);
+  border-color: var(--texto);
+  color: var(--superficie);
+  font-size: 14px;
+}
+
+.botao:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }

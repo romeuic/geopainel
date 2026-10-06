@@ -14,7 +14,8 @@
     "test": "node --test test/*.test.js",
     "dados": "node scripts/dados.mjs",
     "lint": "eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "municipio": "node scripts/municipio.mjs"
   },
   "dependencies": {
     "solid-js": "^1.9.15"

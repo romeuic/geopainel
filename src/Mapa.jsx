@@ -1,8 +1,9 @@
 import { createSignal, For, Show } from 'solid-js';
 import * as fmt from './formato.js';
 
-// Mapa SVG dos municípios. Recebe as formas já projetadas e a cor de cada
-// uma; hover mostra a dica, clique fixa o município no painel.
+// Mapa SVG de áreas (municípios do estado ou bairros de uma cidade). Recebe as
+// formas já projetadas e a cor de cada uma; hover mostra a dica, clique fixa a
+// área no painel. `pontos` (opcional) marca os locais de votação.
 export default function Mapa(props) {
   const [dica, setDica] = createSignal(null);
   let caixa;
@@ -37,6 +38,11 @@ export default function Mapa(props) {
         <g class="municipios">
           <For each={props.formas}>{(f) => <path d={f.d} data-codigo={f.codigo} fill={props.cores[f.codigo]} />}</For>
         </g>
+        <Show when={props.pontos}>
+          <g class="locais" aria-hidden="true">
+            <For each={props.pontos}>{(p) => <circle cx={p.x} cy={p.y} r={p.r} />}</For>
+          </g>
+        </Show>
         <Show when={destaque(props.foco)}>{(d) => <path class="contorno foco" d={d()} />}</Show>
         <Show when={destaque(props.fixado)}>{(d) => <path class="contorno fixado" d={d()} />}</Show>
       </svg>
@@ -52,9 +58,11 @@ export default function Mapa(props) {
             >
               <strong>{m().nome}</strong>
               <span>
-                {fmt.votos(m().votos)} {m().votos === 1 ? 'voto' : 'votos'}
+                {fmt.votos(m().votos)} {props.contagem(m().votos)}
               </span>
-              <span class="fraco">{fmt.pct(m().pct)} dos válidos</span>
+              <span class="fraco">
+                {fmt.pct(m().pct)} {props.dicaPct}
+              </span>
             </div>
           );
         }}
