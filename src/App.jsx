@@ -106,7 +106,7 @@ export default function App() {
         <div class="linha-topo">
           <p class="marca">Geopainel</p>
           <label class="seletor">
-            <span>Candidato</span>
+            <span>Candidatura</span>
             <select value={numero()} onChange={(e) => escolherCandidato(e.currentTarget.value)}>
               <For each={candidatos}>
                 {(c) => (
@@ -223,7 +223,7 @@ export default function App() {
                     <dd>{fmt.pct(m().pct)}</dd>
                     <dt>Votos válidos (dep. estadual)</dt>
                     <dd>{fmt.votos(m().validos)}</dd>
-                    <dt>Parcela do total do candidato</dt>
+                    <dt>Parcela da votação total</dt>
                     <dd>{fmt.pct((m().votos / candidato().votos) * 100)}</dd>
                     <dt>Posição ({MEDIDAS[medida()].rotulo.toLowerCase()})</dt>
                     <dd>

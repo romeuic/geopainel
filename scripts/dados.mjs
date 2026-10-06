@@ -1,13 +1,20 @@
 // Gera os JSONs de src/dados/ a partir das fontes oficiais:
 //   - TSE: resultado da eleição estadual de 2026 (1º turno), um arquivo por município;
 //   - IBGE: malha municipal do RS e nomes dos municípios.
-// Uso: node scripts/dados.mjs [números dos candidatos…]   (padrão: 65065 65656 65444)
+// Uso: node scripts/dados.mjs [números dos candidatos…]   (padrão: os de PADRAO abaixo)
+// Sufixo ":f" marca candidata (ex.: 65123:f) para o cargo sair no feminino; o
+// resultado do TSE não informa gênero e a API de candidaturas bloqueia scripts.
 // Todos os candidatos vão para um único src/dados/votos.json; cada arquivo
 // municipal do TSE é baixado uma vez só, qualquer que seja o número de candidatos.
 
 import { writeFile } from 'node:fs/promises';
 
-const NUMEROS = process.argv.length > 2 ? process.argv.slice(2) : ['65065', '65656', '65444'];
+const PADRAO = ['65065', '65656', '65444', '65653', '65123:f', '65651:f'];
+const PEDIDOS = (process.argv.length > 2 ? process.argv.slice(2) : PADRAO).map((a) => {
+  const [numero, genero] = a.split(':');
+  return { numero, feminino: genero === 'f' };
+});
+const NUMEROS = PEDIDOS.map((p) => p.numero);
 const UF = 'rs';
 const COD_UF_IBGE = 43;
 const ELEICAO = '6259'; // Eleição Ordinária Estadual - 2026 1º Turno
@@ -91,7 +98,8 @@ async function main() {
   for (const l of linhas) porMunicipio[l.ibge] = { validos: l.validos, secoes: l.secoes };
 
   // Por candidato, só os municípios com voto; ausente no JSON = 0 votos.
-  const candidatos = NUMEROS.map((numero) => {
+  const cargoEstadual = estadual.carg.find((c) => c.cd === String(Number(CARGO)));
+  const candidatos = PEDIDOS.map(({ numero, feminino }) => {
     const { cand, par } = noEstado.get(numero);
     const municipios = {};
     for (const l of linhas) {
@@ -107,7 +115,7 @@ async function main() {
       nome: cand.nm,
       nomeUrna: cand.nmu,
       partido: par.sg,
-      cargo: 'Deputado Estadual',
+      cargo: feminino ? cargoEstadual.nmf : cargoEstadual.nmm,
       situacao: cand.st,
       votos: num(cand.vap),
       pct: num(cand.pvapn),
