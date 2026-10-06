@@ -20,11 +20,22 @@ Seletores de partido, cargo e candidatura:
   (comparecimento), ausentes sobre o eleitorado apto; candidaturas e legenda,
   sobre os válidos.
 
+Cada grupo partido + cargo com mais de uma opção ganha um **Total**, que soma
+as opções do grupo município a município (e bairro a bairro nos mapas
+municipais). Não há Total onde o grupo tem uma opção só (PT em Presidente).
+O Total do PCdoB é o total do partido (todos os candidatos + legenda); o do
+PT soma só as opções listadas; o do N/A soma brancos, nulos e ausentes e usa
+o eleitorado como base do "%". Calculado na página (`src/totais.js`), sem
+entrar no JSON; no link, `candidato=total-pcdob`, `total-pt`, `total-na`.
+
 A lista de partidos sai dos dados (sigla do TSE de cada opção); um cargo sem
 opção do partido escolhido fica desabilitado. A seleção fica na URL
 (`?partido=PT&cargo=federal&candidato=1330`; brancos, nulos e ausentes usam
 `candidato=brancos|nulos|ausentes`), então o link pode ser
 compartilhado; só `?candidato=…` também basta.
+
+Sem nada na URL, o site abre em **Presidente → Votos brancos** (`INICIO` em
+`src/App.jsx`).
 
 Solid + Vite, sem backend: todos os dados vivem em JSON dentro de `src/dados/`.
 

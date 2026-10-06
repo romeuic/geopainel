@@ -20,24 +20,40 @@ export const nomeProprio = (s) =>
 
 export const normalizar = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
-// Nome de exibição: candidatura pelo nome de urna; legenda pelo partido.
+// Brancos, nulos, ausentes e totais não têm número de urna para mostrar.
+export const temNumero = (c) => c.tipo !== 'especial' && c.tipo !== 'total';
+
 // Nome de exibição: candidatura pelo nome de urna; legenda pelo partido;
-// brancos, nulos e ausentes (partido "N/A") pelo próprio nome.
+// brancos, nulos e ausentes (partido "N/A") pelo próprio nome; total pelo grupo.
 export const titulo = (c) =>
   c.tipo === 'legenda'
     ? `Votos na legenda ${partido(c.partido)}`
-    : c.tipo === 'especial'
-      ? c.nomeUrna
-      : nomeProprio(c.nomeUrna);
+    : c.tipo === 'total'
+      ? c.partido === 'N/A'
+        ? 'Total brancos, nulos e ausentes'
+        : `Total ${partido(c.partido)}`
+      : c.tipo === 'especial'
+        ? c.nomeUrna
+        : nomeProprio(c.nomeUrna);
 
 // Complemento para frases como "o mapa com …".
 export const descricao = (c) =>
   c.tipo === 'legenda'
     ? `os votos na legenda do ${partido(c.partido)}`
-    : c.tipo === 'especial'
-      ? `os ${c.nomeUrna.toLowerCase()}`
-      : `os votos de ${nomeProprio(c.nomeUrna)}`;
+    : c.tipo === 'total'
+      ? c.partido === 'N/A'
+        ? 'brancos, nulos e ausentes somados'
+        : `os votos somados das opções do ${partido(c.partido)}`
+      : c.tipo === 'especial'
+        ? `os ${c.nomeUrna.toLowerCase()}`
+        : `os votos de ${nomeProprio(c.nomeUrna)}`;
 
-// "1 voto", "3 votos"; para ausentes, "eleitor(es)".
+// "1 voto", "3 votos"; para ausentes (e o total que os inclui), "eleitor(es)".
 export const contagem = (c, n) =>
-  c.numero === 'ausentes' ? (n === 1 ? 'eleitor' : 'eleitores') : n === 1 ? 'voto' : 'votos';
+  c.numero === 'ausentes' || (c.tipo === 'total' && c.partido === 'N/A')
+    ? n === 1
+      ? 'eleitor'
+      : 'eleitores'
+    : n === 1
+      ? 'voto'
+      : 'votos';

@@ -7,8 +7,11 @@ import { cor, posicao } from './escala.js';
 import { criarProjecao } from './projecao.js';
 import * as fmt from './formato.js';
 import { CIDADES_DETALHADAS, RECORTES, carregarCidade } from './cidades.js';
+import { comTotais, votosNaCidade } from './totais.js';
 
-const { cargos, fonte } = resultado;
+// Cada grupo partido + cargo com 2+ opções ganha um "Total" (src/totais.js).
+const cargos = comTotais(resultado.cargos);
+const { fonte } = resultado;
 const projecao = criarProjecao(malha, 1000);
 
 // Formas do estado, que não mudam com cargo nem candidato.
@@ -31,14 +34,19 @@ const doPartido = (cargo, partido) => cargo.candidatos.filter((c) => c.partido =
 const cargoComPartido = (partido, preferido) =>
   preferido && doPartido(preferido, partido).length ? preferido : cargos.find((c) => doPartido(c, partido).length);
 
+// O que abre quem entra no site sem nada na URL.
+const INICIO = { cargo: 'presidente', candidato: 'brancos' };
+
 // Seleção inicial vem de ?partido=…&cargo=…&candidato=…, para o link ser
-// compartilhável. O número manda: partido e cargo são os dele; sem cargo na URL,
-// vale o primeiro cargo onde o número existe (a legenda "65" existe nos dois).
+// compartilhável; sem nenhum dos três, vale INICIO. O número manda: partido e
+// cargo são os dele; sem cargo na URL, vale o primeiro cargo onde o número
+// existe (a legenda "65" existe nos dois).
 function selecaoDaUrl() {
   const busca = new URLSearchParams(location.search);
-  const numero = busca.get('candidato');
+  const vazia = !['partido', 'cargo', 'candidato'].some((k) => busca.has(k));
+  const numero = vazia ? INICIO.candidato : busca.get('candidato');
   const temNumero = (c) => c.candidatos.some((x) => x.numero === numero);
-  const doCargo = cargos.find((c) => c.codigo === busca.get('cargo'));
+  const doCargo = cargos.find((c) => c.codigo === (vazia ? INICIO.cargo : busca.get('cargo')));
   const achado = doCargo && temNumero(doCargo) ? doCargo : cargos.find(temNumero);
   if (achado) {
     const partido = achado.candidatos.find((x) => x.numero === numero).partido;
@@ -146,7 +154,7 @@ export default function App() {
     const c = cidade();
     if (c) {
       const dadosCargo = c.cargos[codigoCargo()];
-      const votos = dadosCargo.votos[numero()] ?? {};
+      const votos = votosNaCidade(candidato(), dadosCargo.votos);
       return vistaCidade().formas.map((f) => {
         const n = votos[f.codigo] ?? 0;
         const validos = dadosCargo.validos[f.codigo] ?? 0;
@@ -287,7 +295,7 @@ export default function App() {
                 <For each={opcoes()}>
                   {(c) => (
                     <option value={c.numero}>
-                      {c.tipo === 'especial' ? fmt.titulo(c) : `${fmt.titulo(c)} — ${c.numero}`}
+                      {fmt.temNumero(c) ? `${fmt.titulo(c)} — ${c.numero}` : fmt.titulo(c)}
                     </option>
                   )}
                 </For>
@@ -297,14 +305,14 @@ export default function App() {
         </div>
         <h1>
           {fmt.titulo(candidato())}{' '}
-          <Show when={candidato().tipo !== 'especial'}>
+          <Show when={fmt.temNumero(candidato())}>
             <span class="numero">{candidato().numero}</span>
           </Show>
         </h1>
         <p class="sub">
           {[
             candidato().cargo,
-            candidato().tipo !== 'especial' && fmt.partido(candidato().partido),
+            candidato().partido !== 'N/A' && fmt.partido(candidato().partido),
             'Rio Grande do Sul',
             fonte.eleicao,
           ]
@@ -314,7 +322,7 @@ export default function App() {
         <dl class="numeros">
           <div>
             <dt>
-              {candidato().numero === 'ausentes' ? 'Ausentes' : 'Votos'}{' '}
+              {candidato().numero === 'ausentes' ? 'Ausentes' : candidato().tipo === 'total' ? 'Total' : 'Votos'}{' '}
               {cidade() ? `em ${cidade().nome}` : 'no estado'}
             </dt>
             <dd>{fmt.votos(totalVista())}</dd>
